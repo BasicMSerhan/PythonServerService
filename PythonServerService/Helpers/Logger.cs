@@ -1,9 +1,12 @@
-﻿using System;
+﻿using PythonServerService.Helpers.Model;
+using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Globalization;
 using System.IO;
 using System.Linq;
 using System.Reflection;
+using System.Threading;
 using System.Threading.Tasks;
 
 namespace RASMachineController
@@ -15,7 +18,11 @@ namespace RASMachineController
 
         private static List<string> LoggerFileTypes = new List<string>();
 
-        private static string CurrentServicePath = Path.GetFullPath(Path.GetDirectoryName(Assembly.GetEntryAssembly().Location));
+        private static ConcurrentQueue<LoggingItem> LoggingItems = new ConcurrentQueue<LoggingItem>();
+
+        public static bool IsBackgroundLoopThreadAborted = false;
+
+        public static int ThreadSleepDelay = 1000;
 
         /// <summary>
         /// Initializes the logger by cleaning up log files older than 10 days
@@ -32,6 +39,9 @@ namespace RASMachineController
                 AddLoggerType("Debug");
 
                 CleanUpLogFiles(10);
+
+                RunBackgroundThread();
+
                 Debug("LOGGER", "Logger Has Been Initialized");
             }
             else
@@ -48,7 +58,7 @@ namespace RASMachineController
         {
             foreach (var type in LoggerFileTypes)
             {
-                CleanUpSingleLogFile(days, CurrentServicePath + "/Logs/" + type + "/");
+                CleanUpSingleLogFile(days, "./Logs/" + type + "/");
             }
             Debug("LOGGER", "CleanUpLogFiles - Done All Log Files Cleanups");
         }
@@ -99,7 +109,6 @@ namespace RASMachineController
         /// <param name="msg"></param>
         public static void Append(string type, string tag, string msg, bool writeToConsole = true)
         {
-            var folder = CurrentServicePath + "/Logs/" + type + "/";
             if (writeToConsole)
                 Console.WriteLine(tag + ": " + msg);
 
@@ -109,31 +118,19 @@ namespace RASMachineController
                 return;
             }
 
-            if (!IsLoggerTypeValid(type))
+            /*if (!IsLoggerTypeValid(type))
             {
                 Error("LOGGER", "Attempting To Log Data For Type: " + type + " While Logger Type Is Not Valid!");
                 return;
-            }
+            }*/
 
-            var date = DateTime.Now;
-
-            string fileName = folder + "Log " + date.ToString("dd-MM-yyyy") + ".txt";
-            string data = "[" + tag + "] " + date.ToString("HH:mm:ss.fff") + ": " + msg;
-
-            try
+            LoggingItems.Enqueue(new LoggingItem
             {
-                if (!File.Exists(fileName))
-                    File.Create(fileName).Dispose();
-
-                File.AppendAllLines(fileName, new List<string>() { data });
-
-            }
-            catch (Exception ex)
-            {
-                Error("LOGGER", "Failed Creating Output Stream For File: " + fileName + " Error: " + ex.Message);
-            }
-
-
+                DateCreated = DateTime.Now,
+                Type = type,
+                Tag = tag,
+                Message = msg
+            });
         }
 
         /// <summary>
@@ -186,6 +183,62 @@ namespace RASMachineController
         public static bool IsLoggerTypeValid(string type)
         {
             return LoggerFileTypes.Contains(type);
+        }
+
+
+        /// <summary>
+        /// This function starts the background thread and starts processing each log
+        /// </summary>
+        private static void RunBackgroundThread()
+        {
+
+            var CurrentBackgroundLoopThread = new Thread(new ThreadStart(delegate
+            {
+                while (!IsBackgroundLoopThreadAborted)
+                {
+                    try
+                    {
+                        List<LoggingItem> logsToWrite = new List<LoggingItem>();
+                        while (LoggingItems.TryDequeue(out LoggingItem log))
+                        {
+                            logsToWrite.Add(log);
+                        }
+
+                        if (logsToWrite.Count > 0)
+                        {
+                            var groupedLogs = logsToWrite.GroupBy(l => l.Type);
+                            foreach (var group in groupedLogs)
+                            {
+                                var folder = "./Logs/" + group.Key + "/";
+                                string fileName = folder + "Log " + DateTime.Now.ToString("dd-MM-yyyy") + ".txt";
+
+                                if (!Directory.Exists(folder))
+                                    Directory.CreateDirectory(folder);
+
+                                List<string> logData = group.Select(l =>
+                                    $"[{l.Tag}] {l.DateCreated:HH:mm:ss.fff}: {l.Message}"
+                                ).ToList();
+
+                                if (!File.Exists(fileName))
+                                    File.Create(fileName).Dispose();
+
+                                File.AppendAllLines(fileName, logData);
+                            }
+                        }
+
+                    }
+                    catch (Exception ex)
+                    {
+                        File.AppendAllText("./Logs/LoggerErrors.txt", "Failed Appending Log Error: " + ex.ToString() + Environment.NewLine);
+                    }
+
+                    Thread.Sleep(ThreadSleepDelay);
+                }
+            }));
+
+            CurrentBackgroundLoopThread.IsBackground = true;
+            CurrentBackgroundLoopThread.Start();
+
         }
 
     }

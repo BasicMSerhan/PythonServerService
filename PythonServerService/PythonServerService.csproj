@@ -56,6 +56,7 @@
   <ItemGroup>
     <Compile Include="Helpers\Constants.cs" />
     <Compile Include="Helpers\Logger.cs" />
+    <Compile Include="Helpers\Model\LoggingItem.cs" />
     <Compile Include="Model\ServerInfoModel.cs" />
     <Compile Include="ProjectInstaller.cs">
       <SubType>Component</SubType>
