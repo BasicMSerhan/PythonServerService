@@ -10,7 +10,7 @@ namespace RASMachineController.Helpers
     public class Constants
     {
 
-        public static string AppVersion = "1.0.3";
+        public static string AppVersion = "1.0.4";
 
         public static string AppName = "PythonServerService";
 

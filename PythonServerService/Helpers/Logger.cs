@@ -24,6 +24,8 @@ namespace RASMachineController
 
         public static int ThreadSleepDelay = 1000;
 
+        private static string CurrentServicePath = Path.GetFullPath(Path.GetDirectoryName(Assembly.GetEntryAssembly().Location));
+
         /// <summary>
         /// Initializes the logger by cleaning up log files older than 10 days
         /// </summary>
@@ -58,7 +60,7 @@ namespace RASMachineController
         {
             foreach (var type in LoggerFileTypes)
             {
-                CleanUpSingleLogFile(days, "./Logs/" + type + "/");
+                CleanUpSingleLogFile(days, CurrentServicePath + "/Logs/" + type + "/");
             }
             Debug("LOGGER", "CleanUpLogFiles - Done All Log Files Cleanups");
         }
@@ -209,7 +211,7 @@ namespace RASMachineController
                             var groupedLogs = logsToWrite.GroupBy(l => l.Type);
                             foreach (var group in groupedLogs)
                             {
-                                var folder = "./Logs/" + group.Key + "/";
+                                var folder = CurrentServicePath + "/Logs/" + group.Key + "/";
                                 string fileName = folder + "Log " + DateTime.Now.ToString("dd-MM-yyyy") + ".txt";
 
                                 if (!Directory.Exists(folder))
@@ -229,7 +231,7 @@ namespace RASMachineController
                     }
                     catch (Exception ex)
                     {
-                        File.AppendAllText("./Logs/LoggerErrors.txt", "Failed Appending Log Error: " + ex.ToString() + Environment.NewLine);
+                        File.AppendAllText(CurrentServicePath + "/Logs/LoggerErrors.txt", "Failed Appending Log Error: " + ex.ToString() + Environment.NewLine);
                     }
 
                     Thread.Sleep(ThreadSleepDelay);
