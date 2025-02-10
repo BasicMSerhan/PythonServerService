@@ -6,7 +6,7 @@ using System.Runtime.InteropServices;
 // set of attributes. Change these attribute values to modify the information
 // associated with an assembly.
 [assembly: AssemblyTitle("Python Server Service")]
-[assembly: AssemblyDescription("MS The Start Python Server Service")]
+[assembly: AssemblyDescription("MS The Star Python Server Service")]
 [assembly: AssemblyConfiguration("")]
 [assembly: AssemblyCompany("Basic Outlet")]
 [assembly: AssemblyProduct("PythonServerService")]

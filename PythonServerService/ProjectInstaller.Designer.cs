@@ -39,7 +39,7 @@
             // 
             // serviceInstaller1
             // 
-            this.serviceInstaller1.Description = "MS The Start Python Server Service";
+            this.serviceInstaller1.Description = "MS The Star Python Server Service";
             this.serviceInstaller1.DisplayName = "Python Server Service";
             this.serviceInstaller1.ServiceName = "PythonServerService";
             this.serviceInstaller1.StartType = System.ServiceProcess.ServiceStartMode.Automatic;
