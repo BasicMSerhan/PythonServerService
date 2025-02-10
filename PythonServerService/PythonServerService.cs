@@ -80,17 +80,27 @@ namespace PythonServerService
             while (!this.CancellationPending)
             {
 
-                var isServerActive = await IsServerActive(server.URL);
-
-                Logger.Debug("HTTP", "HTTP Request To Server: " + server.Name + ", URL: " + server.URL + " Returned Active: " + isServerActive);
-
-                if (!isServerActive)
+                try
                 {
-                    LaunchPythonServer(server);
-                }
 
-                Thread.Sleep(60000);
+                    var isServerActive = await IsServerActive(server.URL);
+
+                    Logger.Debug("HTTP", "HTTP Request To Server: " + server.Name + ", URL: " + server.URL + " Returned Active: " + isServerActive);
+
+                    if (!isServerActive)
+                    {
+                        LaunchPythonServer(server);
+                    }
+
+                    Thread.Sleep(60000);
+                }catch(Exception ex)
+                {
+                    Logger.Error("BACKGROUND", "Background Thread Caught An Error: " + ex.ToString());
+                }
             }
+
+            Logger.Debug("BACKGROUND", "Python Server Service Background Task Stoped!");
+
         }
 
         /// <summary>
@@ -100,57 +110,63 @@ namespace PythonServerService
         {
             new Thread(new ThreadStart(delegate
             {
-
-                if (server.ServerProcess != null)
+                try
                 {
-                    Logger.Debug(server.Name + "-EXEC", "Old Server Process Exists, Stopping Now!");
-                    try
+                    if (server.ServerProcess != null)
                     {
-                        server.ServerProcess.Kill();
-                        Logger.Debug(server.Name + "-EXEC", "Done Stopping Old Server Process!");
+                        Logger.Debug(server.Name + "-EXEC", "Old Server Process Exists, Stopping Now!");
+                        try
+                        {
+                            server.ServerProcess.Kill();
+                            Logger.Debug(server.Name + "-EXEC", "Done Stopping Old Server Process!");
+                        }
+                        catch (Exception ex)
+                        {
+                            Logger.Error(server.Name + "-EXEC", "Error Stopping Old Server Process, Error: " + ex.ToString());
+                        }
                     }
-                    catch(Exception ex) {
-                        Logger.Error(server.Name + "-EXEC", "Error Stopping Old Server Process, Error: " + ex.ToString());
-                    }
+
+                    var pythonServerPath = Path.GetDirectoryName(Assembly.GetEntryAssembly().Location) + $"\\Servers\\{server.Name}\\";
+
+                    Logger.Debug(server.Name + "-EXEC", "Launching Python Server Process In Path: " + pythonServerPath);
+
+                    var cmd = "-u " + pythonServerPath + "ServerHandler.py";
+                    server.ServerProcess = new Process
+                    {
+                        StartInfo = new ProcessStartInfo
+                        {
+                            FileName = "C:\\Python312\\python.exe",
+                            WorkingDirectory = pythonServerPath,
+                            Arguments = cmd,
+                            UseShellExecute = false,
+                            RedirectStandardOutput = true,
+                            RedirectStandardError = true,
+                            CreateNoWindow = true
+                        },
+                        EnableRaisingEvents = true
+                    };
+
+                    server.ServerProcess.ErrorDataReceived += (sender, e) =>
+                    {
+                        Logger.Debug(server.Name + "-OUTPUT", e.Data);
+                    };
+
+                    server.ServerProcess.OutputDataReceived += (sender, e) =>
+                    {
+                        Logger.Debug(server.Name + "-OUTPUT", e.Data);
+                    };
+
+                    server.ServerProcess.Start();
+                    server.ServerProcess.BeginErrorReadLine();
+                    server.ServerProcess.BeginOutputReadLine();
+
+                    Logger.Debug(server.Name + "-EXEC", "Done Launching Server Process, Added Error And Output Listeners");
+
+                    server.ServerProcess.WaitForExit();
+                }catch(Exception ex)
+                {
+                    Logger.Error(server.Name + "-EXEC", "Error While Launching Server Process, Error: " + ex.ToString());
                 }
-
-                var pythonServerPath = Path.GetDirectoryName(Assembly.GetEntryAssembly().Location) + $"\\Servers\\{server.Name}\\";
-
-                Logger.Debug(server.Name + "-EXEC", "Launching Python Server Process In Path: " + pythonServerPath);
-
-                var cmd = "-u " + pythonServerPath + "ServerHandler.py";
-                server.ServerProcess = new Process
-                {
-                    StartInfo = new ProcessStartInfo
-                    {
-                        FileName = "C:\\Python312\\python.exe",
-                        WorkingDirectory = pythonServerPath,
-                        Arguments = cmd,
-                        UseShellExecute = false,
-                        RedirectStandardOutput = true,
-                        RedirectStandardError = true,
-                        CreateNoWindow = true
-                    },
-                    EnableRaisingEvents = true
-                };
-
-                server.ServerProcess.ErrorDataReceived += (sender, e) =>
-                {
-                    Logger.Debug(server.Name + "-OUTPUT", e.Data);
-                };
-
-                server.ServerProcess.OutputDataReceived += (sender, e) =>
-                {
-                    Logger.Debug(server.Name + "-OUTPUT", e.Data);
-                };
-
-                server.ServerProcess.Start();
-                server.ServerProcess.BeginErrorReadLine();
-                server.ServerProcess.BeginOutputReadLine();
-
-                Logger.Debug(server.Name + "-EXEC", "Done Launching Server Process, Added Error And Output Listeners");
-
-                server.ServerProcess.WaitForExit();
             })).Start();
         }
 
